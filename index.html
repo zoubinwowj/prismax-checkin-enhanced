@@ -20,6 +20,97 @@
             padding: 20px;
         }
         
+        /* 密码登录界面样式 */
+        .login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .login-box {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .login-logo {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .login-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #a78bfa;
+        }
+        
+        .login-subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        
+        .password-input {
+            width: 100%;
+            padding: 15px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .password-input:focus {
+            outline: none;
+            border-color: #a78bfa;
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .login-error {
+            color: #f87171;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        /* 主应用样式（保持原样） */
+        .main-app {
+            display: none;
+        }
+        
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -32,6 +123,25 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
         }
         
         .header h1 {
@@ -48,7 +158,7 @@
         .server-status {
             position: absolute;
             top: 20px;
-            right: 20px;
+            left: 20px;
             padding: 10px 20px;
             background: #1e293b;
             border-radius: 20px;
@@ -347,151 +457,292 @@
             }
             
             .server-status {
-                position: relative;
-                top: auto;
-                right: auto;
+                position: static;
                 margin-bottom: 20px;
+            }
+            
+            .logout-btn {
+                position: static;
+                margin-top: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="server-status">
-        <span class="status-dot"></span>
-        <span>Vercel云端</span>
+    <!-- 密码登录界面 -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-box">
+            <div class="login-logo">🔐</div>
+            <h2 class="login-title">Prismax 批量签到工具</h2>
+            <p class="login-subtitle">请输入访问密码</p>
+            <input 
+                type="password" 
+                class="password-input" 
+                id="passwordInput" 
+                placeholder="请输入密码"
+                autocomplete="off"
+                onkeypress="if(event.keyCode==13) checkPassword()"
+            >
+            <button class="login-btn" id="loginBtn" onclick="checkPassword()">
+                进入系统
+            </button>
+            <div class="login-error" id="loginError">
+                密码错误，请重试！
+            </div>
+        </div>
     </div>
     
-    <div class="container">
-        <div class="header">
-            <h1>🚀 Prismax 批量签到工具</h1>
-            <p>Vercel云端版本 - 免费稳定，全球加速</p>
+    <!-- 主应用界面 -->
+    <div class="main-app" id="mainApp">
+        <div class="server-status">
+            <span class="status-dot"></span>
+            <span>Vercel云端</span>
         </div>
         
-        <div class="alert alert-info">
-            ☁️ <strong>Vercel云端部署</strong>：本工具部署在Vercel平台，免费使用，全球CDN加速。所有代理配置在前端完成，数据仅在浏览器本地保存。
-        </div>
-        
-        <div class="control-panel">
-            <button class="btn btn-primary" id="startBtn" onclick="startBatchCheckin()">
-                <span>▶️</span> 开始批量签到
-            </button>
-            <button class="btn btn-secondary" onclick="clearLog()">
-                <span>🗑️</span> 清除日志
-            </button>
-            <button class="btn btn-secondary" onclick="exportResults()">
-                <span>💾</span> 导出结果
-            </button>
-            <button class="btn btn-secondary" onclick="testProxies()">
-                <span>🔍</span> 测试代理
-            </button>
-            <button class="btn btn-secondary" onclick="saveAllData()">
-                <span>💾</span> 保存数据
-            </button>
-        </div>
-        
-        <div class="main-grid">
-            <div class="card">
-                <h2>📝 钱包地址输入</h2>
-                <textarea 
-                    class="input-area" 
-                    id="walletInput" 
-                    placeholder="请输入钱包地址，每行一个&#10;例如：&#10;3wpBRtHxojYpj7pTwTNKdeEBEnCuDgynfmN32paqDouL&#10;另一个完整的钱包地址..."
-                ></textarea>
-                
-                <h2 style="margin-top: 20px;">🔐 代理设置</h2>
-                <textarea 
-                    class="input-area" 
-                    id="proxyInput" 
-                    placeholder="请输入代理，每行一个&#10;格式：host:port:username:password&#10;例如：&#10;185.230.245.187:12321:username:password&#10;dynamic.proxy.com:1080:user:pass (动态住宅代理)&#10;支持SOCKS5代理，包括动态IP代理"
-                    style="height: 120px;"
-                ></textarea>
-                
-                <div class="options-grid">
-                    <div class="option-item">
-                        <label>延迟时间(秒):</label>
-                        <input type="number" id="delay" value="2" min="1" max="5">
+        <div class="container">
+            <div class="header">
+                <button class="logout-btn" onclick="logout()">
+                    🚪 退出登录
+                </button>
+                <h1>🚀 Prismax 批量签到工具</h1>
+                <p>Vercel云端版本 - 免费稳定，全球加速</p>
+            </div>
+            
+            <div class="alert alert-info">
+                ☁️ <strong>Vercel云端部署</strong>：本工具部署在Vercel平台，免费使用，全球CDN加速。所有代理配置在前端完成，数据仅在浏览器本地保存。
+            </div>
+            
+            <div class="control-panel">
+                <button class="btn btn-primary" id="startBtn" onclick="startBatchCheckin()">
+                    <span>▶️</span> 开始批量签到
+                </button>
+                <button class="btn btn-secondary" onclick="clearLog()">
+                    <span>🗑️</span> 清除日志
+                </button>
+                <button class="btn btn-secondary" onclick="exportResults()">
+                    <span>💾</span> 导出结果
+                </button>
+                <button class="btn btn-secondary" onclick="testProxies()">
+                    <span>🔍</span> 测试代理
+                </button>
+                <button class="btn btn-secondary" onclick="saveAllData()">
+                    <span>💾</span> 保存数据
+                </button>
+            </div>
+            
+            <div class="main-grid">
+                <div class="card">
+                    <h2>📝 钱包地址输入</h2>
+                    <textarea 
+                        class="input-area" 
+                        id="walletInput" 
+                        placeholder="请输入钱包地址，每行一个&#10;例如：&#10;3wpBRtHxojYpj7pTwTNKdeEBEnCuDgynfmN32paqDouL&#10;另一个完整的钱包地址..."
+                    ></textarea>
+                    
+                    <h2 style="margin-top: 20px;">🔐 代理设置</h2>
+                    <textarea 
+                        class="input-area" 
+                        id="proxyInput" 
+                        placeholder="请输入代理，每行一个&#10;格式：host:port:username:password&#10;例如：&#10;185.230.245.187:12321:username:password&#10;dynamic.proxy.com:1080:user:pass (动态住宅代理)&#10;支持SOCKS5代理，包括动态IP代理"
+                        style="height: 120px;"
+                    ></textarea>
+                    
+                    <div class="options-grid">
+                        <div class="option-item">
+                            <label>延迟时间(秒):</label>
+                            <input type="number" id="delay" value="2" min="1" max="5">
+                        </div>
+                        <div class="option-item">
+                            <label>
+                                <input type="checkbox" id="useProxy">
+                                使用代理
+                            </label>
+                        </div>
                     </div>
-                    <div class="option-item">
-                        <label>
-                            <input type="checkbox" id="useProxy">
-                            使用代理
-                        </label>
+                    
+                    <div class="tips">
+                        <p>💡 使用提示：</p>
+                        <ul>
+                            <li>钱包地址必须是完整的44个字符</li>
+                            <li>代理格式：host:port:username:password</li>
+                            <li>支持动态住宅代理（每次请求不同IP）</li>
+                            <li>建议配置多个代理以提高成功率</li>
+                            <li>大量钱包建议分批处理</li>
+                            <li>所有数据仅保存在您的浏览器本地</li>
+                        </ul>
                     </div>
                 </div>
                 
-                <div class="tips">
-                    <p>💡 使用提示：</p>
-                    <ul>
-                        <li>钱包地址必须是完整的44个字符</li>
-                        <li>代理格式：host:port:username:password</li>
-                        <li>支持动态住宅代理（每次请求不同IP）</li>
-                        <li>建议配置多个代理以提高成功率</li>
-                        <li>大量钱包建议分批处理</li>
-                        <li>所有数据仅保存在您的浏览器本地</li>
-                    </ul>
+                <div class="card">
+                    <h2>📊 任务状态</h2>
+                    <div class="task-info" id="taskInfo">
+                        <h4>任务ID: <span id="taskId">-</span></h4>
+                        <div>状态: <span id="taskStatus">-</span></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressBar">0%</div>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <h5>总钱包数</h5>
+                            <div class="value" id="statTotal">0</div>
+                        </div>
+                        <div class="stat-item">
+                            <h5>成功</h5>
+                            <div class="value" style="color: #4ade80;" id="statSuccess">0</div>
+                        </div>
+                        <div class="stat-item">
+                            <h5>已签到</h5>
+                            <div class="value" style="color: #fbbf24;" id="statAlready">0</div>
+                        </div>
+                        <div class="stat-item">
+                            <h5>失败</h5>
+                            <div class="value" style="color: #f87171;" id="statFailed">0</div>
+                        </div>
+                    </div>
+                    <div class="proxy-status-bar">
+                        <span>代理状态：<span id="proxyStatus" style="color: #94a3b8;">未配置</span></span>
+                        <span>获得积分：<span id="totalPoints" style="color: #60a5fa; font-weight: bold;">0</span></span>
+                    </div>
                 </div>
             </div>
             
             <div class="card">
-                <h2>📊 任务状态</h2>
-                <div class="task-info" id="taskInfo">
-                    <h4>任务ID: <span id="taskId">-</span></h4>
-                    <div>状态: <span id="taskStatus">-</span></div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressBar">0%</div>
-                    </div>
-                </div>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <h5>总钱包数</h5>
-                        <div class="value" id="statTotal">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <h5>成功</h5>
-                        <div class="value" style="color: #4ade80;" id="statSuccess">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <h5>已签到</h5>
-                        <div class="value" style="color: #fbbf24;" id="statAlready">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <h5>失败</h5>
-                        <div class="value" style="color: #f87171;" id="statFailed">0</div>
-                    </div>
-                </div>
-                <div class="proxy-status-bar">
-                    <span>代理状态：<span id="proxyStatus" style="color: #94a3b8;">未配置</span></span>
-                    <span>获得积分：<span id="totalPoints" style="color: #60a5fa; font-weight: bold;">0</span></span>
-                </div>
+                <h2>📋 运行日志</h2>
+                <div class="log-container" id="logContainer"></div>
             </div>
-        </div>
-        
-        <div class="card">
-            <h2>📋 运行日志</h2>
-            <div class="log-container" id="logContainer"></div>
-        </div>
-        
-        <div class="footer">
-            <p>© 2025 Prismax签到工具 | 部署在 Vercel | 服务器时间: <span id="serverTime"></span></p>
+            
+            <div class="footer">
+                <p>© 2025 Prismax签到工具 | 部署在 Vercel | 服务器时间: <span id="serverTime"></span></p>
+            </div>
         </div>
     </div>
     
     <script>
+        // ===== 密码保护相关代码 =====
+        // 设置你的访问密码（修改这里！）
+        const ACCESS_PASSWORD = "Mango2025"; // 请修改为你想要的密码
+        
+        // 检查是否已登录
+        function checkAuth() {
+            const savedAuth = localStorage.getItem('prismax_auth');
+            const authExpiry = localStorage.getItem('prismax_auth_expiry');
+            
+            if (savedAuth && authExpiry) {
+                const now = new Date().getTime();
+                if (now < parseInt(authExpiry)) {
+                    // 已登录且未过期
+                    showMainApp();
+                    return;
+                }
+            }
+            
+            // 需要登录
+            showLoginScreen();
+        }
+        
+        // 显示登录界面
+        function showLoginScreen() {
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('passwordInput').focus();
+        }
+        
+        // 显示主应用
+        function showMainApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            initializeApp();
+        }
+        
+        // 检查密码
+        function checkPassword() {
+            const inputPassword = document.getElementById('passwordInput').value;
+            const loginError = document.getElementById('loginError');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (inputPassword === ACCESS_PASSWORD) {
+                // 密码正确
+                loginError.style.display = 'none';
+                loginBtn.disabled = true;
+                loginBtn.textContent = '登录成功...';
+                
+                // 保存登录状态（7天有效期）
+                const expiry = new Date().getTime() + (7 * 24 * 60 * 60 * 1000);
+                localStorage.setItem('prismax_auth', 'true');
+                localStorage.setItem('prismax_auth_expiry', expiry.toString());
+                
+                // 延迟显示主应用
+                setTimeout(() => {
+                    showMainApp();
+                }, 500);
+            } else {
+                // 密码错误
+                loginError.style.display = 'block';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+                
+                // 3秒后隐藏错误提示
+                setTimeout(() => {
+                    loginError.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('prismax_auth');
+            localStorage.removeItem('prismax_auth_expiry');
+            location.reload();
+        }
+        
+        // ===== 原有的应用代码 =====
         // 全局变量
         let currentTaskId = null;
         let taskCheckInterval = null;
         let taskData = null;
         
+        // 初始化应用
+        function initializeApp() {
+            // 加载保存的配置
+            const savedWallets = localStorage.getItem('walletList');
+            if (savedWallets) {
+                document.getElementById('walletInput').value = savedWallets;
+            }
+            
+            const savedProxies = localStorage.getItem('proxyList');
+            if (savedProxies) {
+                document.getElementById('proxyInput').value = savedProxies;
+            }
+            
+            const savedDelay = localStorage.getItem('delay');
+            if (savedDelay) document.getElementById('delay').value = savedDelay;
+            
+            const savedUseProxy = localStorage.getItem('useProxy');
+            if (savedUseProxy !== null) document.getElementById('useProxy').checked = savedUseProxy === 'true';
+            
+            log('🌐 Prismax批量签到工具已启动', 'success');
+            log('Vercel云端版本就绪，支持最多50个钱包批量签到', 'info');
+            log('💡 提示：Vercel版本立即返回结果，无需等待', 'info');
+            
+            // 启动服务器时间更新
+            updateServerTime();
+            setInterval(updateServerTime, 1000);
+        }
+        
         // 更新服务器时间
         function updateServerTime() {
-            document.getElementById('serverTime').textContent = new Date().toLocaleString('zh-CN');
+            const serverTimeElement = document.getElementById('serverTime');
+            if (serverTimeElement) {
+                serverTimeElement.textContent = new Date().toLocaleString('zh-CN');
+            }
         }
-        setInterval(updateServerTime, 1000);
-        updateServerTime();
         
         // 日志函数
         function log(message, type = 'info') {
             const logContainer = document.getElementById('logContainer');
+            if (!logContainer) return;
+            
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
             const timestamp = new Date().toLocaleTimeString();
@@ -702,19 +953,6 @@
             log('Vercel版本无需停止任务，签到立即完成', 'info');
         }
         
-        // 简化的任务监控（Vercel版本不需要）
-        function startTaskMonitoring() {
-            // Vercel版本立即返回结果，无需监控
-        }
-        
-        function stopTaskMonitoring() {
-            // Vercel版本立即返回结果，无需监控
-        }
-        
-        function updateTaskStatus(task) {
-            // Vercel版本立即返回结果，无需更新状态
-        }
-        
         // 清除日志
         function clearLog() {
             document.getElementById('logContainer').innerHTML = '';
@@ -750,28 +988,9 @@
             log('结果已导出到文件', 'success');
         }
         
-        // 页面加载完成后
+        // 页面加载完成后检查认证
         window.addEventListener('DOMContentLoaded', () => {
-            // 加载保存的配置
-            const savedWallets = localStorage.getItem('walletList');
-            if (savedWallets) {
-                document.getElementById('walletInput').value = savedWallets;
-            }
-            
-            const savedProxies = localStorage.getItem('proxyList');
-            if (savedProxies) {
-                document.getElementById('proxyInput').value = savedProxies;
-            }
-            
-            const savedDelay = localStorage.getItem('delay');
-            if (savedDelay) document.getElementById('delay').value = savedDelay;
-            
-            const savedUseProxy = localStorage.getItem('useProxy');
-            if (savedUseProxy !== null) document.getElementById('useProxy').checked = savedUseProxy === 'true';
-            
-            log('🌐 Prismax批量签到工具已启动', 'success');
-            log('Vercel云端版本就绪，支持最多50个钱包批量签到', 'info');
-            log('💡 提示：Vercel版本立即返回结果，无需等待', 'info');
+            checkAuth();
         });
     </script>
 </body>
