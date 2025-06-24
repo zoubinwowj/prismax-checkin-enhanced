@@ -1,38 +1,33 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/batch-checkin",
-      "dest": "/api/batch-checkin.py"
-    },
-    {
-      "src": "/api/test-proxy",
-      "dest": "/api/test-proxy.py"
-    },
-    {
-      "src": "/api/task/(.*)",
-      "dest": "/api/task.py"
-    },
-    {
-      "src": "/api/stop-task/(.*)",
-      "dest": "/api/stop-task.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
   "functions": {
     "api/**/*.py": {
-      "runtime": "python3.9"
+      "runtime": "python3.9",
+      "maxDuration": 30
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/batch-checkin",
+      "destination": "/api/batch-checkin.py"
+    },
+    {
+      "source": "/api/test-proxy",
+      "destination": "/api/test-proxy.py"
+    },
+    {
+      "source": "/api/task/(.*)",
+      "destination": "/api/task.py"
+    },
+    {
+      "source": "/api/stop-task/(.*)",
+      "destination": "/api/stop-task.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
