@@ -154,13 +154,9 @@ class handler(BaseHTTPRequestHandler):
                 )
                 
                 if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        if data.get('success') and data.get('data'):
-                            old_points = data['data'].get('total_points', 0)
-                    except json.JSONDecodeError:
-                        # 如果无法解析JSON，忽略并继续
-                        pass
+                    data = response.json()
+                    if data.get('success') and data.get('data'):
+                        old_points = data['data'].get('total_points', 0)
             except Exception:
                 pass
             
@@ -177,15 +173,7 @@ class handler(BaseHTTPRequestHandler):
             )
             
             if response.status_code == 200:
-                try:
-                    data = response.json()
-                except json.JSONDecodeError:
-                    # 如果响应不是JSON格式，返回错误
-                    return {
-                        'success': False,
-                        'wallet': wallet_address,
-                        'error': f'服务器返回非JSON响应: {response.text[:100]}'
-                    }
+                data = response.json()
                 
                 if data.get('success'):
                     result_data = data.get('data', {})

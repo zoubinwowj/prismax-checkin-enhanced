@@ -894,13 +894,7 @@
                     })
                 });
                 
-                let data;
-                try {
-                    data = await response.json();
-                } catch (error) {
-                    // 如果响应不是JSON格式，直接抛出错误
-                    throw new Error(`服务器返回非JSON响应`);
-                }
+                const data = await response.json();
                 
                 if (data.success) {
                     currentTaskId = data.task_id;
