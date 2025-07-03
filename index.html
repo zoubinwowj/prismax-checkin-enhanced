@@ -848,17 +848,13 @@
                 return;
             }
             
-            const wallets = walletText.split('\n')
+            const allWallets = walletText.split('\n')
                 .map(line => line.trim())
                 .filter(line => line && line.length === 44);
             
-            if (wallets.length === 0) {
+            if (allWallets.length === 0) {
                 log('没有找到有效的钱包地址！请确保地址长度为44个字符', 'error');
                 return;
-            }
-            
-            if (wallets.length > 1000) {
-                log('钱包数量过多，建议分批处理以获得更好效果', 'warning');
             }
             
             const proxyList = proxyText.split('\n')
@@ -873,7 +869,7 @@
                 proxy_list: proxyList
             };
             
-            log(`开始批量签到，共 ${wallets.length} 个钱包`, 'info');
+            log(`开始批量签到，共 ${allWallets.length} 个钱包`, 'info');
             
             // 禁用按钮
             document.getElementById('startBtn').disabled = true;
@@ -882,62 +878,93 @@
             document.getElementById('taskId').textContent = '处理中...';
             document.getElementById('taskStatus').textContent = 'running';
             
+            // 分批处理钱包，每批最多10个
+            const batchSize = 10;
+            const batches = [];
+            for (let i = 0; i < allWallets.length; i += batchSize) {
+                batches.push(allWallets.slice(i, i + batchSize));
+            }
+            
+            log(`将分 ${batches.length} 批处理，每批最多 ${batchSize} 个钱包`, 'info');
+            
+            // 累计统计
+            const totalStats = {
+                total: 0,
+                success: 0,
+                already: 0,
+                failed: 0,
+                points: 0
+            };
+            
             try {
-                const response = await fetch('/api/batch-checkin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        wallets: wallets,
-                        options: options
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    currentTaskId = data.task_id;
-                    log(`批量签到完成: ${currentTaskId.substring(0, 8)}...`, 'success');
+                // 依次处理每批
+                for (let i = 0; i < batches.length; i++) {
+                    const batch = batches[i];
+                    log(`处理第 ${i + 1}/${batches.length} 批，包含 ${batch.length} 个钱包...`, 'info');
                     
-                    // 直接处理结果（Vercel版本立即返回结果）
-                    const stats = data.stats;
-                    document.getElementById('statTotal').textContent = stats.total || 0;
-                    document.getElementById('statSuccess').textContent = stats.success || 0;
-                    document.getElementById('statAlready').textContent = stats.already || 0;
-                    document.getElementById('statFailed').textContent = stats.failed || 0;
-                    document.getElementById('totalPoints').textContent = stats.points || 0;
+                    const response = await fetch('/api/batch-checkin', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            wallets: batch,
+                            options: options
+                        })
+                    });
                     
-                    // 更新进度条
-                    const total = stats.total || 1;
-                    const completed = (stats.success || 0) + (stats.already || 0);
-                    const progress = Math.round((completed / total) * 100);
-                    document.getElementById('progressBar').style.width = `${progress}%`;
-                    document.getElementById('progressBar').textContent = `${progress}%`;
+                    const data = await response.json();
                     
-                    // 显示详细结果
-                    if (data.results) {
-                        data.results.forEach(result => {
-                            if (result.success) {
-                                if (result.already_claimed) {
-                                    log(`钱包 ${result.wallet.substring(0, 10)}... 今日已签到`, 'warning');
+                    if (data.success) {
+                        // 累加统计数据
+                        totalStats.total += data.stats.total || 0;
+                        totalStats.success += data.stats.success || 0;
+                        totalStats.already += data.stats.already || 0;
+                        totalStats.failed += data.stats.failed || 0;
+                        totalStats.points += data.stats.points || 0;
+                        
+                        // 显示每批的详细结果
+                        if (data.results) {
+                            data.results.forEach(result => {
+                                if (result.success) {
+                                    if (result.already_claimed) {
+                                        log(`钱包 ${result.wallet.substring(0, 10)}... 今日已签到`, 'warning');
+                                    } else {
+                                        log(`钱包 ${result.wallet.substring(0, 10)}... 签到成功！获得 ${result.points_awarded} 积分`, 'success');
+                                    }
                                 } else {
-                                    log(`钱包 ${result.wallet.substring(0, 10)}... 签到成功！获得 ${result.points_awarded} 积分`, 'success');
+                                    log(`钱包 ${result.wallet.substring(0, 10)}... 签到失败: ${result.error}`, 'error');
                                 }
-                            } else {
-                                log(`钱包 ${result.wallet.substring(0, 10)}... 签到失败: ${result.error}`, 'error');
-                            }
-                        });
+                            });
+                        }
+                        
+                        // 更新实时统计显示
+                        document.getElementById('statTotal').textContent = totalStats.total;
+                        document.getElementById('statSuccess').textContent = totalStats.success;
+                        document.getElementById('statAlready').textContent = totalStats.already;
+                        document.getElementById('statFailed').textContent = totalStats.failed;
+                        document.getElementById('totalPoints').textContent = totalStats.points;
+                        
+                        // 更新进度条
+                        const completed = totalStats.success + totalStats.already;
+                        const progress = Math.round((completed / allWallets.length) * 100);
+                        document.getElementById('progressBar').style.width = `${progress}%`;
+                        document.getElementById('progressBar').textContent = `${progress}%`;
+                        
+                        // 批次之间稍作延迟
+                        if (i < batches.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                    } else {
+                        log(`第 ${i + 1} 批处理失败: ${data.message}`, 'error');
+                        totalStats.failed += batch.length;
                     }
-                    
-                    document.getElementById('taskStatus').textContent = 'completed';
-                    
-                    const successRate = ((stats.success || 0) + (stats.already || 0)) / (stats.total || 1) * 100;
-                    log(`🎉 批量签到完成！成功率${successRate.toFixed(1)}%，共获得 ${stats.points} 积分`, 'success');
-                    
-                } else {
-                    throw new Error(data.message);
                 }
+                
+                // 所有批次处理完成
+                document.getElementById('taskStatus').textContent = 'completed';
+                const successRate = ((totalStats.success + totalStats.already) / totalStats.total) * 100;
+                log(`🎉 所有批次处理完成！总成功率${successRate.toFixed(1)}%，共获得 ${totalStats.points} 积分`, 'success');
             } catch (error) {
                 log(`批量签到失败: ${error.message}`, 'error');
                 document.getElementById('taskStatus').textContent = 'failed';
