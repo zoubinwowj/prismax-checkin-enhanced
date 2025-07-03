@@ -120,9 +120,9 @@ class handler(BaseHTTPRequestHandler):
             user_url = 'https://www.prismax.io/api/get-users'
             
             try:
-                user_response = session.post(
-                    user_url,
-                    json={'wallet': wallet_address},
+                # 使用GET方法并将wallet作为查询参数
+                user_response = session.get(
+                    f"{user_url}?wallet={wallet_address}",
                     timeout=timeout
                 )
                 
