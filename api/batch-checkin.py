@@ -1,247 +1,245 @@
-from http.server import BaseHTTPRequestHandler
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Vercel Serverless Function for batch checkin
+"""
+
 import json
+import uuid
 import requests
+import random
 import time
 from datetime import datetime
-import concurrent.futures
-import threading
+from http.server import BaseHTTPRequestHandler
+
+# API配置
+API_BASE = "https://app-prismax-backend-1053158761087.us-west2.run.app/api"
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
+        """处理OPTIONS请求（CORS预检）"""
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
-
+        
     def do_POST(self):
+        """处理POST请求"""
         try:
+            # 读取请求体
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
             
             wallets = data.get('wallets', [])
             options = data.get('options', {})
-            task_id = data.get('taskId', str(int(time.time() * 1000)))
             
-            # 限制钱包数量
-            if len(wallets) > 1000:
-                self.send_error_response("Too many wallets (max 1000)", 400)
+            # 验证钱包地址
+            valid_wallets = [w.strip() for w in wallets if w and len(w.strip()) == 44]
+            if not valid_wallets:
+                self.send_error_response(400, '没有有效的钱包地址')
                 return
             
-            # 立即返回任务ID，避免超时
-            # 使用线程池并发处理钱包
+            # 限制钱包数量
+            batch_size = 50  # 减少批量大小以避免超时
+            if len(valid_wallets) > batch_size:
+                valid_wallets = valid_wallets[:batch_size]
+            
+            use_proxy = options.get('use_proxy', False)
+            proxy_list = options.get('proxy_list', []) if use_proxy else []
+            delay = max(0.5, min(3, options.get('delay', 1)))  # 减少延迟时间
+            
+            # 执行批量签到
             results = []
-            max_concurrent = 10  # 并发数
+            stats = {
+                'total': len(valid_wallets),
+                'success': 0,
+                'already': 0,
+                'failed': 0,
+                'points': 0
+            }
             
-            # 如果钱包数量少，直接处理并返回
-            if len(wallets) <= 15:
-                # 少量钱包直接处理
-                with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(wallets), 5)) as executor:
-                    future_to_wallet = {
-                        executor.submit(self.checkin_wallet, wallet.strip(), options): wallet 
-                        for wallet in wallets if wallet.strip()
-                    }
-                    
-                    for future in concurrent.futures.as_completed(future_to_wallet):
-                        result = future.result()
-                        results.append(result)
+            for i, wallet in enumerate(valid_wallets):
+                # 代理轮换
+                current_proxy_list = None
+                if proxy_list:
+                    proxy_index = i % len(proxy_list)
+                    current_proxy_list = [proxy_list[proxy_index]]
                 
-                # 立即返回结果
-                self.send_json_response({
-                    'success': True,
-                    'results': results,
-                    'taskId': task_id,
-                    'timestamp': datetime.now().isoformat()
-                })
-            else:
-                # 大量钱包分批处理
-                batch_size = 10
-                batches = [wallets[i:i + batch_size] for i in range(0, len(wallets), batch_size)]
+                result = self.checkin_wallet(wallet, current_proxy_list)
+                results.append(result)
                 
-                # 处理前两批并立即返回部分结果
-                initial_results = []
-                for batch in batches[:2]:
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(batch), 5)) as executor:
-                        future_to_wallet = {
-                            executor.submit(self.checkin_wallet, wallet.strip(), options): wallet 
-                            for wallet in batch if wallet.strip()
-                        }
-                        
-                        for future in concurrent.futures.as_completed(future_to_wallet):
-                            result = future.result()
-                            initial_results.append(result)
+                if result['success']:
+                    if result['already_claimed']:
+                        stats['already'] += 1
+                    else:
+                        stats['success'] += 1
+                        stats['points'] += result['points_awarded']
+                else:
+                    stats['failed'] += 1
                 
-                # 返回初始结果
-                self.send_json_response({
-                    'success': True,
-                    'results': initial_results,
-                    'taskId': task_id,
-                    'partial': True,
-                    'total': len(wallets),
-                    'processed': len(initial_results),
-                    'message': f'已处理 {len(initial_results)}/{len(wallets)} 个钱包，剩余钱包正在后台处理',
-                    'timestamp': datetime.now().isoformat()
-                })
+                # 添加短暂延迟
+                if i < len(valid_wallets) - 1:
+                    time.sleep(delay)
             
-        except json.JSONDecodeError as e:
-            self.send_error_response("Invalid JSON format", 400)
+            task_id = str(uuid.uuid4())
+            
+            # 发送成功响应
+            response_data = {
+                'success': True,
+                'task_id': task_id,
+                'message': f'批量签到完成，共处理 {len(valid_wallets)} 个钱包',
+                'results': results,
+                'stats': stats
+            }
+            
+            self.send_json_response(200, response_data)
+            
         except Exception as e:
-            self.send_error_response(str(e), 500)
-
-    def checkin_wallet(self, wallet_address, options):
+            self.send_error_response(500, str(e))
+    
+    def parse_proxy(self, proxy_string):
+        """解析代理字符串"""
+        try:
+            parts = proxy_string.strip().split(':')
+            if len(parts) >= 4:
+                host = parts[0]
+                port = parts[1]
+                username = parts[2]
+                password = ':'.join(parts[3:])
+                return {
+                    'http': f'socks5://{username}:{password}@{host}:{port}',
+                    'https': f'socks5://{username}:{password}@{host}:{port}'
+                }
+        except Exception:
+            pass
+        return None
+    
+    def get_random_proxy(self, proxy_list):
+        """智能代理选择"""
+        if not proxy_list:
+            return None
+        
+        proxy_string = random.choice(proxy_list)
+        return self.parse_proxy(proxy_string)
+    
+    def checkin_wallet(self, wallet_address, proxy_list=None):
         """签到单个钱包"""
         try:
-            # 创建会话
             session = requests.Session()
             session.headers.update({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Origin': 'https://www.prismax.io',
-                'Referer': 'https://www.prismax.io/'
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Origin': 'https://app.prismax.ai',
+                'Referer': 'https://app.prismax.ai/',
             })
             
-            # 配置代理
-            if options.get('useProxy') and options.get('proxy'):
-                proxy_parts = options['proxy'].split(':')
-                if len(proxy_parts) >= 4:
-                    # SOCKS5代理格式: ip:port:username:password
-                    proxy_url = f"socks5://{proxy_parts[2]}:{proxy_parts[3]}@{proxy_parts[0]}:{proxy_parts[1]}"
-                    session.proxies = {
-                        'http': proxy_url,
-                        'https': proxy_url
-                    }
+            # 设置代理
+            proxy_info = "无代理"
+            if proxy_list:
+                proxy = self.get_random_proxy(proxy_list)
+                if proxy:
+                    session.proxies = proxy
+                    proxy_info = "使用代理"
             
-            # 减少超时时间
-            timeout = 10
-            
-            # 首先获取用户信息
-            user_url = 'https://www.prismax.io/api/get-users'
-            
+            # 先获取用户信息
+            old_points = 0
             try:
-                # 使用GET方法并将wallet作为查询参数
-                user_response = session.get(
-                    f"{user_url}?wallet={wallet_address}",
-                    timeout=timeout
+                response = session.get(
+                    f"{API_BASE}/get-users",
+                    params={'wallet_address': wallet_address},
+                    timeout=10
                 )
                 
-                if user_response.status_code != 200:
-                    return {
-                        'success': False,
-                        'wallet': wallet_address,
-                        'error': f'User API error: HTTP {user_response.status_code}'
-                    }
-                
-                try:
-                    user_data = user_response.json()
-                    current_points = user_data.get('data', {}).get('point', 0)
-                except:
-                    current_points = 0
-                    
-            except requests.exceptions.Timeout:
-                return {
-                    'success': False,
-                    'wallet': wallet_address,
-                    'error': 'User API timeout'
-                }
-            except Exception as e:
-                current_points = 0
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        if data.get('success') and data.get('data'):
+                            old_points = data['data'].get('total_points', 0)
+                    except json.JSONDecodeError:
+                        # 如果无法解析JSON，忽略并继续
+                        pass
+            except Exception:
+                pass
             
             # 执行签到
-            checkin_url = 'https://www.prismax.io/api/daily-login-points'
-            today_date = datetime.now().strftime('%Y-%m-%d')
+            checkin_data = {
+                'wallet_address': wallet_address,
+                'user_local_date': datetime.now().strftime('%Y-%m-%d')
+            }
             
-            try:
-                checkin_response = session.post(
-                    checkin_url,
-                    json={
-                        'wallet': wallet_address,
-                        'loginDate': today_date
-                    },
-                    timeout=timeout
-                )
-                
-                if checkin_response.status_code != 200:
-                    return {
-                        'success': False,
-                        'wallet': wallet_address,
-                        'error': f'Checkin API error: HTTP {checkin_response.status_code}'
-                    }
-                
+            response = session.post(
+                f"{API_BASE}/daily-login-points",
+                json=checkin_data,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
                 try:
-                    checkin_data = checkin_response.json()
-                except:
+                    data = response.json()
+                except json.JSONDecodeError:
+                    # 如果响应不是JSON格式，返回错误
                     return {
                         'success': False,
                         'wallet': wallet_address,
-                        'error': 'Invalid response format'
+                        'error': f'服务器返回非JSON响应: {response.text[:100]}'
                     }
                 
-                # 解析签到结果
-                if checkin_data.get('success'):
-                    points_earned = checkin_data.get('data', {}).get('points', 0)
+                if data.get('success'):
+                    result_data = data.get('data', {})
+                    points_awarded = result_data.get('points_awarded_today', 0)
+                    already_claimed = result_data.get('already_claimed_daily', False)
+                    new_points = result_data.get('total_points', old_points)
+                    
                     return {
                         'success': True,
                         'wallet': wallet_address,
-                        'points': points_earned,
-                        'totalPoints': current_points + points_earned,
-                        'message': 'Check-in successful'
+                        'already_claimed': already_claimed,
+                        'points_awarded': points_awarded,
+                        'old_points': old_points,
+                        'new_points': new_points,
+                        'proxy_used': proxy_info
                     }
                 else:
-                    # 检查是否已签到
-                    message = checkin_data.get('message', '')
-                    if 'already' in message.lower() or 'daily login' in message.lower():
-                        return {
-                            'success': True,
-                            'wallet': wallet_address,
-                            'points': 0,
-                            'totalPoints': current_points,
-                            'alreadyChecked': True,
-                            'message': 'Already checked in today'
-                        }
-                    else:
-                        return {
-                            'success': False,
-                            'wallet': wallet_address,
-                            'error': message or 'Check-in failed'
-                        }
-                        
-            except requests.exceptions.Timeout:
-                return {
-                    'success': False,
-                    'wallet': wallet_address,
-                    'error': 'Checkin API timeout'
-                }
-            except Exception as e:
-                return {
-                    'success': False,
-                    'wallet': wallet_address,
-                    'error': str(e)[:50]
-                }
-                
+                    error_msg = data.get('message', '未知错误')
+                    return {
+                        'success': False,
+                        'wallet': wallet_address,
+                        'error': f'API错误: {error_msg}'
+                    }
+            
+            return {
+                'success': False,
+                'wallet': wallet_address,
+                'error': f'HTTP错误: {response.status_code}'
+            }
+            
+        except requests.exceptions.Timeout:
+            return {
+                'success': False,
+                'wallet': wallet_address,
+                'error': '请求超时'
+            }
         except Exception as e:
             return {
                 'success': False,
                 'wallet': wallet_address,
                 'error': str(e)[:50]
             }
-
-    def send_json_response(self, data):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
-
-    def send_error_response(self, message, status_code=500):
+    
+    def send_json_response(self, status_code, data):
+        """发送JSON响应"""
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        error_data = {
+        self.wfile.write(json.dumps(data).encode())
+    
+    def send_error_response(self, status_code, message):
+        """发送错误响应"""
+        self.send_json_response(status_code, {
             'success': False,
-            'error': message,
-            'timestamp': datetime.now().isoformat()
-        }
-        self.wfile.write(json.dumps(error_data).encode('utf-8'))
+            'message': message
+        })
