@@ -42,7 +42,7 @@ class handler(BaseHTTPRequestHandler):
                 return
             
             # 限制钱包数量
-            batch_size = 50  # 减少批量大小以避免超时
+            batch_size = 500  # 增加批量大小到500
             if len(valid_wallets) > batch_size:
                 valid_wallets = valid_wallets[:batch_size]
             

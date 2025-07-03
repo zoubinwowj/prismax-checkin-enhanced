@@ -722,7 +722,7 @@
             if (savedUseProxy !== null) document.getElementById('useProxy').checked = savedUseProxy === 'true';
             
             log('🌐 Prismax批量签到工具已启动', 'success');
-            log('Vercel云端版本就绪，支持最多50个钱包批量签到', 'info');
+            log('Vercel云端版本就绪，支持最多500个钱包批量签到', 'info');
             log('💡 提示：Vercel版本立即返回结果，无需等待', 'info');
             
             // 启动服务器时间更新
@@ -898,9 +898,8 @@
                 try {
                     data = await response.json();
                 } catch (error) {
-                    // 如果响应不是JSON格式，尝试获取文本
-                    const text = await response.text();
-                    throw new Error(`服务器返回非JSON响应: ${text.substring(0, 100)}`);
+                    // 如果响应不是JSON格式，直接抛出错误
+                    throw new Error(`服务器返回非JSON响应`);
                 }
                 
                 if (data.success) {
