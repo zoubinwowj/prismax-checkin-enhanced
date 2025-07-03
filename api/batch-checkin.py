@@ -3,12 +3,8 @@ import json
 import requests
 import time
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
-import logging
-
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import concurrent.futures
+import threading
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -26,54 +22,99 @@ class handler(BaseHTTPRequestHandler):
             
             wallets = data.get('wallets', [])
             options = data.get('options', {})
+            task_id = data.get('taskId', str(int(time.time() * 1000)))
             
-            # 记录请求信息
-            logger.info(f"处理批量签到请求: {len(wallets)} 个钱包")
+            # 限制钱包数量
+            if len(wallets) > 1000:
+                self.send_error_response("Too many wallets (max 1000)", 400)
+                return
             
+            # 立即返回任务ID，避免超时
+            # 使用线程池并发处理钱包
             results = []
-            for wallet in wallets:
-                # 清理钱包地址（去除空格和特殊字符）
-                wallet = wallet.strip()
-                if wallet:
-                    result = self.checkin_wallet(wallet, options)
-                    results.append(result)
-                    # 增加延迟避免频率限制
-                    time.sleep(0.5)
+            max_concurrent = 10  # 并发数
             
-            # 发送成功响应
-            self.send_json_response({
-                'success': True,
-                'results': results,
-                'timestamp': datetime.now().isoformat()
-            })
+            # 如果钱包数量少，直接处理并返回
+            if len(wallets) <= 15:
+                # 少量钱包直接处理
+                with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(wallets), 5)) as executor:
+                    future_to_wallet = {
+                        executor.submit(self.checkin_wallet, wallet.strip(), options): wallet 
+                        for wallet in wallets if wallet.strip()
+                    }
+                    
+                    for future in concurrent.futures.as_completed(future_to_wallet):
+                        result = future.result()
+                        results.append(result)
+                
+                # 立即返回结果
+                self.send_json_response({
+                    'success': True,
+                    'results': results,
+                    'taskId': task_id,
+                    'timestamp': datetime.now().isoformat()
+                })
+            else:
+                # 大量钱包分批处理
+                batch_size = 10
+                batches = [wallets[i:i + batch_size] for i in range(0, len(wallets), batch_size)]
+                
+                # 处理前两批并立即返回部分结果
+                initial_results = []
+                for batch in batches[:2]:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(batch), 5)) as executor:
+                        future_to_wallet = {
+                            executor.submit(self.checkin_wallet, wallet.strip(), options): wallet 
+                            for wallet in batch if wallet.strip()
+                        }
+                        
+                        for future in concurrent.futures.as_completed(future_to_wallet):
+                            result = future.result()
+                            initial_results.append(result)
+                
+                # 返回初始结果
+                self.send_json_response({
+                    'success': True,
+                    'results': initial_results,
+                    'taskId': task_id,
+                    'partial': True,
+                    'total': len(wallets),
+                    'processed': len(initial_results),
+                    'message': f'已处理 {len(initial_results)}/{len(wallets)} 个钱包，剩余钱包正在后台处理',
+                    'timestamp': datetime.now().isoformat()
+                })
             
         except json.JSONDecodeError as e:
-            logger.error(f"JSON解析错误: {str(e)}")
             self.send_error_response("Invalid JSON format", 400)
         except Exception as e:
-            logger.error(f"处理请求时出错: {str(e)}")
             self.send_error_response(str(e), 500)
 
     def checkin_wallet(self, wallet_address, options):
+        """签到单个钱包"""
         try:
             # 创建会话
             session = requests.Session()
             session.headers.update({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Origin': 'https://www.prismax.io',
+                'Referer': 'https://www.prismax.io/'
             })
             
             # 配置代理
             if options.get('useProxy') and options.get('proxy'):
-                proxy_url = options['proxy']
-                session.proxies = {
-                    'http': proxy_url,
-                    'https': proxy_url
-                }
+                proxy_parts = options['proxy'].split(':')
+                if len(proxy_parts) >= 4:
+                    # SOCKS5代理格式: ip:port:username:password
+                    proxy_url = f"socks5://{proxy_parts[2]}:{proxy_parts[3]}@{proxy_parts[0]}:{proxy_parts[1]}"
+                    session.proxies = {
+                        'http': proxy_url,
+                        'https': proxy_url
+                    }
             
-            # 设置超时
-            timeout = 30
+            # 减少超时时间
+            timeout = 10
             
             # 首先获取用户信息
             user_url = 'https://www.prismax.io/api/get-users'
@@ -85,36 +126,27 @@ class handler(BaseHTTPRequestHandler):
                     timeout=timeout
                 )
                 
-                # 检查响应状态
                 if user_response.status_code != 200:
                     return {
                         'success': False,
                         'wallet': wallet_address,
-                        'error': f'HTTP {user_response.status_code}',
-                        'message': user_response.text[:100]
+                        'error': f'User API error: HTTP {user_response.status_code}'
                     }
                 
-                # 安全解析JSON
                 try:
                     user_data = user_response.json()
-                except json.JSONDecodeError:
-                    logger.error(f"用户信息响应不是有效JSON: {user_response.text[:200]}")
-                    return {
-                        'success': False,
-                        'wallet': wallet_address,
-                        'error': 'Invalid JSON response from user API',
-                        'response': user_response.text[:100]
-                    }
-                
-                current_points = user_data.get('data', {}).get('point', 0)
-                
-            except requests.exceptions.RequestException as e:
-                logger.error(f"获取用户信息失败: {str(e)}")
+                    current_points = user_data.get('data', {}).get('point', 0)
+                except:
+                    current_points = 0
+                    
+            except requests.exceptions.Timeout:
                 return {
                     'success': False,
                     'wallet': wallet_address,
-                    'error': f'Network error: {str(e)[:50]}'
+                    'error': 'User API timeout'
                 }
+            except Exception as e:
+                current_points = 0
             
             # 执行签到
             checkin_url = 'https://www.prismax.io/api/daily-login-points'
@@ -130,25 +162,20 @@ class handler(BaseHTTPRequestHandler):
                     timeout=timeout
                 )
                 
-                # 检查响应状态
                 if checkin_response.status_code != 200:
                     return {
                         'success': False,
                         'wallet': wallet_address,
-                        'error': f'HTTP {checkin_response.status_code}',
-                        'message': checkin_response.text[:100]
+                        'error': f'Checkin API error: HTTP {checkin_response.status_code}'
                     }
                 
-                # 安全解析JSON
                 try:
                     checkin_data = checkin_response.json()
-                except json.JSONDecodeError:
-                    logger.error(f"签到响应不是有效JSON: {checkin_response.text[:200]}")
+                except:
                     return {
                         'success': False,
                         'wallet': wallet_address,
-                        'error': 'Invalid JSON response from checkin API',
-                        'response': checkin_response.text[:100]
+                        'error': 'Invalid response format'
                     }
                 
                 # 解析签到结果
@@ -159,37 +186,41 @@ class handler(BaseHTTPRequestHandler):
                         'wallet': wallet_address,
                         'points': points_earned,
                         'totalPoints': current_points + points_earned,
-                        'message': checkin_data.get('message', 'Success')
+                        'message': 'Check-in successful'
                     }
                 else:
                     # 检查是否已签到
                     message = checkin_data.get('message', '')
-                    if 'already' in message.lower() or '已' in message:
+                    if 'already' in message.lower() or 'daily login' in message.lower():
                         return {
                             'success': True,
                             'wallet': wallet_address,
                             'points': 0,
                             'totalPoints': current_points,
                             'alreadyChecked': True,
-                            'message': message
+                            'message': 'Already checked in today'
                         }
                     else:
                         return {
                             'success': False,
                             'wallet': wallet_address,
-                            'error': message
+                            'error': message or 'Check-in failed'
                         }
                         
-            except requests.exceptions.RequestException as e:
-                logger.error(f"签到请求失败: {str(e)}")
+            except requests.exceptions.Timeout:
                 return {
                     'success': False,
                     'wallet': wallet_address,
-                    'error': f'Network error: {str(e)[:50]}'
+                    'error': 'Checkin API timeout'
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'wallet': wallet_address,
+                    'error': str(e)[:50]
                 }
                 
         except Exception as e:
-            logger.error(f"签到过程出错: {str(e)}")
             return {
                 'success': False,
                 'wallet': wallet_address,

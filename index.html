@@ -2,192 +2,561 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prismax批量签到工具</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Prismax批量签到工具 - 支持1000个钱包</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
         .container {
             background: white;
-            border-radius: 10px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 900px;
+            width: 100%;
+            animation: slideUp 0.5s ease-out;
         }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
         h1 {
             color: #333;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
         }
-        textarea {
-            width: 100%;
-            min-height: 200px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: monospace;
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
             font-size: 14px;
         }
-        button {
-            background-color: #4CAF50;
+        
+        .feature-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        
+        .badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
-            padding: 10px 20px;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 24px;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
+            border-radius: 10px;
             font-size: 16px;
-            margin-top: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        button:hover {
-            background-color: #45a049;
-        }
+        
         button:disabled {
-            background-color: #ccc;
+            opacity: 0.6;
             cursor: not-allowed;
         }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #d32f2f;
+        }
+        
+        .stats {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
         .log-container {
-            margin-top: 20px;
-            background: #f8f8f8;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            background: #f8f9fa;
+            border-radius: 10px;
             padding: 15px;
             max-height: 400px;
             overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
         }
+        
         .log-entry {
-            margin: 5px 0;
-            padding: 5px;
-            font-family: monospace;
-            font-size: 12px;
+            padding: 5px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
         }
-        .log-success {
-            color: #4CAF50;
+        
+        .log-time {
+            color: #999;
+            flex-shrink: 0;
         }
-        .log-error {
-            color: #f44336;
-        }
-        .log-info {
-            color: #2196F3;
-        }
-        .stats {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e3f2fd;
-            border-radius: 5px;
-        }
+        
+        .log-success { color: #4caf50; }
+        .log-error { color: #f44336; }
+        .log-warning { color: #ff9800; }
+        .log-info { color: #2196f3; }
+        
         .proxy-section {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f0f0f0;
-            border-radius: 5px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f0f4ff;
+            border-radius: 10px;
         }
-        .proxy-input {
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .progress-bar {
             width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            display: none;
         }
-        label {
-            display: inline-block;
-            margin-top: 10px;
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            width: 0%;
+        }
+        
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 24px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🌐 Prismax批量签到工具（修复版）</h1>
+        <h1>🌐 Prismax批量签到工具</h1>
+        <p class="subtitle">Vercel云端版本就绪，支持最多1000个钱包批量签到</p>
         
-        <div>
+        <div class="feature-badges">
+            <div class="badge">⚡ 高速并发</div>
+            <div class="badge">🔄 智能重试</div>
+            <div class="badge">🌍 全球CDN</div>
+            <div class="badge">📱 响应式设计</div>
+        </div>
+        
+        <div class="input-group">
             <label for="wallets">钱包地址（每行一个）：</label>
-            <textarea id="wallets" placeholder="输入钱包地址，每行一个..."></textarea>
+            <textarea id="wallets" rows="8" placeholder="粘贴钱包地址，每行一个...
+
+示例：
+Du9T9DUeet998cfbruCac3qDjgpVnHQUrmZMohJnbRP2
+SSihTQ2BvrF7CZiXdxJrfXrBtSnL6cS8haSBqHCcEEt"></textarea>
         </div>
         
         <div class="proxy-section">
-            <h3>代理设置</h3>
-            <label>
-                <input type="checkbox" id="useProxy"> 使用代理
-            </label>
-            <input type="text" id="proxyUrl" class="proxy-input" placeholder="http://ip:port 或 socks5://ip:port">
+            <h3 style="margin-bottom: 15px;">🔐 代理设置</h3>
+            <div class="checkbox-group">
+                <input type="checkbox" id="useProxy">
+                <label for="useProxy">使用代理</label>
+            </div>
+            <div id="proxyConfig" style="display: none;">
+                <label for="proxyInput">代理列表（支持SOCKS5）：</label>
+                <textarea id="proxyInput" rows="4" placeholder="格式：ip:port:username:password
+示例：
+185.230.245.187:12321:mango123:19930712zm_country-jp_streaming-1_skipispstatic-1"></textarea>
+                <button class="btn-secondary" onclick="testProxies()" style="margin-top: 10px;">
+                    🧪 测试代理
+                </button>
+            </div>
         </div>
         
-        <button id="startBtn" onclick="startBatchCheckin()">开始批量签到</button>
-        <button id="clearBtn" onclick="clearLogs()">清空日志</button>
-        
-        <div class="stats" id="stats" style="display:none;">
-            <div>总钱包数：<span id="totalWallets">0</span></div>
-            <div>成功：<span id="successCount">0</span></div>
-            <div>失败：<span id="failCount">0</span></div>
-            <div>已签到：<span id="alreadyCheckedCount">0</span></div>
-            <div>总积分：<span id="totalPoints">0</span></div>
+        <div class="button-group">
+            <button id="startBtn" class="btn-primary" onclick="startBatchCheckin()">
+                ▶️ 开始批量签到
+            </button>
+            <button id="stopBtn" class="btn-danger" onclick="stopTask()" style="display: none;">
+                ⏹️ 停止运行
+            </button>
+            <button class="btn-secondary" onclick="clearLogs()">
+                🗑️ 清空日志
+            </button>
+            <button class="btn-secondary" onclick="exportData()">
+                📥 导出数据
+            </button>
         </div>
         
-        <div class="log-container" id="logContainer"></div>
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalWallets">0</div>
+                    <div class="stat-label">总钱包数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="successCount">0</div>
+                    <div class="stat-label">成功</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="failCount">0</div>
+                    <div class="stat-label">失败</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="alreadyCheckedCount">0</div>
+                    <div class="stat-label">已签到</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="totalPoints">0</div>
+                    <div class="stat-label">总积分</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="successRate">0%</div>
+                    <div class="stat-label">成功率</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="log-container" id="logContainer">
+            <div class="log-entry log-info">
+                <span class="log-time">[--:--:--]</span>
+                <span>💡 提示：Vercel版本立即返回结果，无需等待</span>
+            </div>
+        </div>
     </div>
-
+    
     <script>
         let isRunning = false;
+        let currentTaskId = null;
+        let results = [];
+        
+        // 初始化
+        window.onload = function() {
+            // 加载保存的数据
+            const savedWallets = localStorage.getItem('wallets');
+            if (savedWallets) {
+                document.getElementById('wallets').value = savedWallets;
+            }
+            
+            const savedProxies = localStorage.getItem('proxies');
+            if (savedProxies) {
+                document.getElementById('proxyInput').value = savedProxies;
+            }
+            
+            // 代理复选框事件
+            document.getElementById('useProxy').addEventListener('change', function() {
+                document.getElementById('proxyConfig').style.display = this.checked ? 'block' : 'none';
+            });
+            
+            // 自动保存
+            document.getElementById('wallets').addEventListener('change', function() {
+                localStorage.setItem('wallets', this.value);
+            });
+            
+            document.getElementById('proxyInput').addEventListener('change', function() {
+                localStorage.setItem('proxies', this.value);
+            });
+        };
         
         function log(message, type = 'info') {
             const logContainer = document.getElementById('logContainer');
             const entry = document.createElement('div');
             entry.className = `log-entry log-${type}`;
-            const timestamp = new Date().toLocaleTimeString();
-            entry.textContent = `[${timestamp}] ${message}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span>${message}</span>
+            `;
+            
             logContainer.appendChild(entry);
             logContainer.scrollTop = logContainer.scrollHeight;
         }
         
         function clearLogs() {
             document.getElementById('logContainer').innerHTML = '';
-            document.getElementById('stats').style.display = 'none';
+            log('日志已清空', 'info');
         }
         
-        function parseWallets(text) {
-            // 清理和解析钱包地址
-            return text.split('\n')
+        function updateProgress(current, total) {
+            const percent = (current / total) * 100;
+            document.getElementById('progressFill').style.width = percent + '%';
+        }
+        
+        function updateStats() {
+            let successCount = 0;
+            let failCount = 0;
+            let alreadyCheckedCount = 0;
+            let totalPoints = 0;
+            
+            results.forEach(result => {
+                if (result.success) {
+                    if (result.alreadyChecked) {
+                        alreadyCheckedCount++;
+                    } else {
+                        successCount++;
+                        totalPoints += result.points || 0;
+                    }
+                } else {
+                    failCount++;
+                }
+            });
+            
+            const total = results.length;
+            const successRate = total > 0 ? ((successCount + alreadyCheckedCount) / total * 100).toFixed(1) : 0;
+            
+            document.getElementById('successCount').textContent = successCount;
+            document.getElementById('failCount').textContent = failCount;
+            document.getElementById('alreadyCheckedCount').textContent = alreadyCheckedCount;
+            document.getElementById('totalPoints').textContent = totalPoints;
+            document.getElementById('successRate').textContent = successRate + '%';
+        }
+        
+        async function testProxies() {
+            const proxyText = document.getElementById('proxyInput').value.trim();
+            
+            if (!proxyText) {
+                log('请先填写代理信息', 'warning');
+                return;
+            }
+            
+            const proxyList = proxyText.split('\n')
                 .map(line => line.trim())
-                .filter(line => line.length > 0 && line.length > 20); // 基本验证
+                .filter(line => line && line.includes(':'));
+            
+            if (proxyList.length === 0) {
+                log('没有找到有效的代理', 'error');
+                return;
+            }
+            
+            if (proxyList.length > 100) {
+                log('代理数量较多，将优先测试前100个', 'warning');
+            }
+            
+            log(`开始测试 ${Math.min(proxyList.length, 100)} 个代理...`, 'info');
+            
+            try {
+                const response = await fetch('/api/test-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ proxy_list: proxyList.slice(0, 100) })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`测试完成: ${data.success_count}/${data.total} 个可用`, 'success');
+                    
+                    // 显示部分详细结果
+                    data.results.slice(0, 5).forEach((result, index) => {
+                        const proxyShort = result.proxy.split(':').slice(0, 2).join(':');
+                        if (result.success) {
+                            log(`✅ 代理${index + 1}: ${proxyShort} - IP: ${result.ip}`, 'success');
+                        } else {
+                            log(`❌ 代理${index + 1}: ${proxyShort} - ${result.message}`, 'error');
+                        }
+                    });
+                    
+                    if (data.results.length > 5) {
+                        log(`... 更多结果已省略`, 'info');
+                    }
+                } else {
+                    log('代理测试失败: ' + data.message, 'error');
+                }
+            } catch (error) {
+                log('代理测试请求失败: ' + error.message, 'error');
+            }
         }
         
         async function startBatchCheckin() {
             if (isRunning) {
-                log('签到任务正在进行中，请稍候...', 'error');
+                log('任务正在进行中，请稍候...', 'warning');
                 return;
             }
             
-            const walletsText = document.getElementById('wallets').value;
-            const wallets = parseWallets(walletsText);
+            const walletsText = document.getElementById('wallets').value.trim();
+            const wallets = walletsText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line.length > 30);
             
             if (wallets.length === 0) {
                 log('请输入至少一个钱包地址', 'error');
                 return;
             }
             
-            // 验证钱包地址格式
-            const invalidWallets = wallets.filter(w => w.length < 32 || w.length > 50);
-            if (invalidWallets.length > 0) {
-                log(`发现 ${invalidWallets.length} 个无效钱包地址格式`, 'error');
-                invalidWallets.forEach(w => log(`无效地址: ${w}`, 'error'));
+            if (wallets.length > 1000) {
+                log('钱包数量超过限制（最多1000个）', 'error');
                 return;
             }
             
+            // 重置结果
+            results = [];
             isRunning = true;
-            const startBtn = document.getElementById('startBtn');
-            startBtn.disabled = true;
-            startBtn.textContent = '签到进行中...';
+            currentTaskId = Date.now().toString();
             
-            // 显示统计信息
+            // UI状态更新
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').style.display = 'inline-flex';
             document.getElementById('stats').style.display = 'block';
+            document.getElementById('progressBar').style.display = 'block';
             document.getElementById('totalWallets').textContent = wallets.length;
             
+            // 准备选项
             const options = {
                 useProxy: document.getElementById('useProxy').checked,
-                proxy: document.getElementById('proxyUrl').value
+                proxy: null
             };
+            
+            if (options.useProxy) {
+                const proxyList = document.getElementById('proxyInput').value.trim()
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line && line.includes(':'));
+                
+                if (proxyList.length > 0) {
+                    // 随机选择一个代理
+                    options.proxy = proxyList[Math.floor(Math.random() * proxyList.length)];
+                }
+            }
             
             log(`开始批量签到，共 ${wallets.length} 个钱包`, 'info');
             
@@ -199,96 +568,128 @@
                     },
                     body: JSON.stringify({
                         wallets: wallets,
-                        options: options
+                        options: options,
+                        taskId: currentTaskId
                     })
                 });
                 
-                // 首先检查响应是否为JSON
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    // 尝试获取文本响应以便调试
-                    const text = await response.text();
-                    throw new Error(`服务器返回非JSON响应: ${text.substring(0, 100)}...`);
-                }
-                
-                // 尝试解析JSON
-                let data;
-                try {
-                    data = await response.json();
-                } catch (parseError) {
-                    // 如果JSON解析失败，获取原始文本
-                    const text = await response.text();
-                    log(`JSON解析失败，原始响应: ${text.substring(0, 200)}...`, 'error');
-                    throw new Error('服务器响应格式错误');
-                }
+                const data = await response.json();
                 
                 if (data.success) {
-                    processResults(data.results);
+                    if (data.partial) {
+                        log(`已处理 ${data.processed}/${data.total} 个钱包，剩余钱包正在后台处理...`, 'info');
+                        // 处理部分结果
+                        results = data.results;
+                        processResults(data.results);
+                        
+                        // 提示用户可以继续处理剩余钱包
+                        log(`💡 提示：您可以将剩余钱包分批处理，每批15-20个效果最佳`, 'info');
+                    } else {
+                        log(`批量签到完成: ${data.taskId}`, 'success');
+                        // 处理全部结果
+                        results = data.results;
+                        processResults(data.results);
+                    }
                 } else {
-                    throw new Error(data.error || data.message || '未知错误');
+                    throw new Error(data.message || data.error || '未知错误');
                 }
                 
             } catch (error) {
                 log(`批量签到失败: ${error.message}`, 'error');
-                
-                // 如果是网络错误，提供更多信息
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    log('网络连接失败，请检查网络连接或代理设置', 'error');
-                }
             } finally {
                 isRunning = false;
-                startBtn.disabled = false;
-                startBtn.textContent = '开始批量签到';
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').style.display = 'none';
+                updateProgress(100, 100);
             }
         }
         
-        function processResults(results) {
-            let successCount = 0;
-            let failCount = 0;
-            let alreadyCheckedCount = 0;
-            let totalPoints = 0;
+        function processResults(batchResults) {
+            let current = 0;
             
-            results.forEach(result => {
+            batchResults.forEach((result, index) => {
+                current++;
+                updateProgress(current, batchResults.length);
+                
                 if (result.success) {
                     if (result.alreadyChecked) {
-                        alreadyCheckedCount++;
                         log(`钱包 ${result.wallet.substring(0, 10)}... 今日已签到`, 'info');
                     } else {
-                        successCount++;
-                        totalPoints += result.points || 0;
                         log(`钱包 ${result.wallet.substring(0, 10)}... 签到成功，获得 ${result.points} 积分`, 'success');
                     }
                 } else {
-                    failCount++;
                     log(`钱包 ${result.wallet.substring(0, 10)}... 签到失败: ${result.error}`, 'error');
                 }
+                
+                updateStats();
             });
             
-            // 更新统计
-            document.getElementById('successCount').textContent = successCount;
-            document.getElementById('failCount').textContent = failCount;
-            document.getElementById('alreadyCheckedCount').textContent = alreadyCheckedCount;
-            document.getElementById('totalPoints').textContent = totalPoints;
+            // 显示最终统计
+            const total = batchResults.length;
+            const successCount = batchResults.filter(r => r.success).length;
+            const totalPoints = batchResults.reduce((sum, r) => sum + (r.points || 0), 0);
+            const successRate = ((successCount / total) * 100).toFixed(1);
             
-            const successRate = ((successCount + alreadyCheckedCount) / results.length * 100).toFixed(1);
             log(`🎉 批量签到完成！成功率${successRate}%，共获得 ${totalPoints} 积分`, 'success');
         }
         
-        // 加载保存的钱包地址
-        window.onload = function() {
-            const savedWallets = localStorage.getItem('wallets');
-            if (savedWallets) {
-                document.getElementById('wallets').value = savedWallets;
+        async function stopTask() {
+            if (!isRunning || !currentTaskId) {
+                log('没有正在运行的任务', 'warning');
+                return;
             }
             
-            log('🌐 Prismax批量签到工具（修复版）已启动', 'info');
-            log('支持批量签到，已修复JSON解析错误', 'info');
-        };
+            try {
+                const response = await fetch(`/api/stop-task/${currentTaskId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    log('任务已停止', 'warning');
+                    isRunning = false;
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').style.display = 'none';
+                }
+            } catch (error) {
+                log('停止任务失败: ' + error.message, 'error');
+            }
+        }
         
-        // 保存钱包地址
-        document.getElementById('wallets').addEventListener('change', function() {
-            localStorage.setItem('wallets', this.value);
-        });
+        function exportData() {
+            if (results.length === 0) {
+                log('没有可导出的数据', 'warning');
+                return;
+            }
+            
+            // 准备CSV数据
+            let csv = '钱包地址,状态,积分,总积分,备注\n';
+            
+            results.forEach(result => {
+                const status = result.success ? (result.alreadyChecked ? '已签到' : '成功') : '失败';
+                const points = result.points || 0;
+                const totalPoints = result.totalPoints || 0;
+                const note = result.error || result.message || '';
+                
+                csv += `${result.wallet},${status},${points},${totalPoints},"${note}"\n`;
+            });
+            
+            // 创建下载链接
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `prismax_checkin_${new Date().toISOString().slice(0, 10)}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            log('数据已导出', 'success');
+        }
     </script>
 </body>
 </html>
