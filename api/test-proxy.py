@@ -69,8 +69,8 @@ class handler(BaseHTTPRequestHandler):
                 username = parts[2]
                 password = ':'.join(parts[3:])
                 return {
-                    'http': f'socks5://{username}:{password}@{host}:{port}',
-                    'https': f'socks5://{username}:{password}@{host}:{port}'
+                    'http': f'http://{username}:{password}@{host}:{port}',
+                    'https': f'http://{username}:{password}@{host}:{port}'
                 }
         except Exception:
             pass
